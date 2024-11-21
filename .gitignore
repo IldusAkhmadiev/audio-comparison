@@ -1,0 +1,17 @@
+# Игнорировать локальные файлы конфигурации
+src/main/resources/application.properties
+
+# Игнорировать папки сборки
+/build/
+.gradle/
+
+# Игнорировать IDE-файлы
+*.iml
+.idea/
+.vscode/
+
+# Игнорировать временные файлы
+*.log
+*.tmp
+*.swp
+

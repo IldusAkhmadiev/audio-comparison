@@ -1,0 +1,9 @@
+# База данных
+spring.datasource.url=jdbc:postgresql://localhost:5432/audio_comparison
+spring.datasource.username=your_username
+spring.datasource.password=
+
+# Дополнительные настройки
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=update
+3333ddddddddddccccccвввdddddddddddddddddddd
