@@ -8,13 +8,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
-
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 
 @RestController
 @RequestMapping("/upload")
+@CrossOrigin(origins = "*")
 public class RestAudioController {
 
     @Autowired
@@ -55,11 +55,13 @@ public class RestAudioController {
                 .body(audioFile.getAudioData());
     }
 
+    // Получение всех аудиофайлов
     @GetMapping
     public List<AudioFile> getAllAudioFiles() {
         return audioFileRepository.findAll();
     }
 
+    // Удаление аудиофайла по ID
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteAudioFile(@PathVariable Long id) {
         if (audioFileRepository.existsById(id)) {
@@ -68,5 +70,28 @@ public class RestAudioController {
         } else {
             return ResponseEntity.status(404).body("Audio file not found.");
         }
+    }
+
+    // Метод для сравнения двух аудиофайлов по точности
+    @PostMapping("/compare")
+    public ResponseEntity<String> compareAudio(@RequestParam("userAudioId") Long userAudioId, @RequestParam("referenceAudioId") Long referenceAudioId) {
+        AudioFile userAudio = audioFileRepository.findById(userAudioId).orElse(null);
+        AudioFile referenceAudio = audioFileRepository.findById(referenceAudioId).orElse(null);
+
+        if (userAudio == null || referenceAudio == null) {
+            return ResponseEntity.status(404).body("One or both audio files not found.");
+        }
+
+        // Логика сравнения аудио
+        double accuracy = compareAudioFiles(userAudio.getAudioData(), referenceAudio.getAudioData());
+        return ResponseEntity.ok("Accuracy: " + accuracy + "%");
+    }
+
+    // Логика для сравнения двух аудиофайлов
+    private double compareAudioFiles(byte[] userAudioData, byte[] referenceAudioData) {
+        // Замените этот метод на фактическую логику сравнения аудио
+        // Например, можно использовать алгоритмы для сравнения аудиофайлов на основе характеристик звука
+        // Для упрощения, вернем фиксированное значение
+        return 95.0; // Пример, вернем 95% точности
     }
 }

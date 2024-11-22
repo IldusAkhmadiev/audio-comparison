@@ -1,116 +1,282 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+    <title>Сравнение аудио</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Recording</title>
+    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <style>
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+    </style>
 </head>
-<body>
-<h1>Записать свой голос</h1>
-<button id="startBtn">Начать запись</button>
-<button id="stopBtn" disabled>Остановить запись</button>
-<br/>
-<audio id="audioPreview" controls></audio>
-<br/>
-<button id="sendBtn" disabled>Отправить аудио</button>
+<body class="bg-gray-50">
+<div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-8 text-center">Сравнение аудио</h1>
 
-<h1>Список загруженных аудио</h1>
-<div id="audioList"></div>
+    <div class="section bg-white shadow">
+        <h2 class="text-xl font-bold mb-4">Записать свой голос</h2>
+        <div class="space-y-4">
+            <div class="flex space-x-4">
+                <button id="startBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    Начать запись
+                </button>
+                <button id="stopBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" disabled>
+                    Остановить запись
+                </button>
+            </div>
+            <audio id="audioPreview" controls class="w-full"></audio>
+            <button id="sendBtn" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" disabled>
+                Отправить аудио
+            </button>
+        </div>
+    </div>
+
+    <div class="section bg-white shadow">
+        <h2 class="text-xl font-bold mb-4">Загрузить эталонное аудио</h2>
+        <input type="file" id="referenceAudioInput" accept="audio/*" class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-blue-50 file:text-blue-700
+                hover:file:bg-blue-100">
+    </div>
+
+    <div class="section bg-white shadow">
+        <h2 class="text-xl font-bold mb-4">Список аудио</h2>
+        <div id="audioList" class="space-y-2"></div>
+    </div>
+
+    <div class="section bg-white shadow">
+        <h2 class="text-xl font-bold mb-4">Выбор для сравнения</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block mb-2">Выберите ваше аудио:</label>
+                <select id="userAudioSelect" class="w-full p-2 border rounded">
+                    <option value="">Выберите аудио</option>
+                </select>
+            </div>
+            <div>
+                <label class="block mb-2">Выберите эталонное аудио:</label>
+                <select id="referenceAudioSelect" class="w-full p-2 border rounded">
+                    <option value="">Выберите аудио</option>
+                </select>
+            </div>
+            <button id="compareBtn" class="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Сравнить
+            </button>
+            <div id="comparisonResult" class="mt-4 p-4 bg-green-50 text-green-700 rounded hidden"></div>
+        </div>
+    </div>
+</div>
 
 <script>
+    // Глобальные переменные для записи
     let mediaRecorder;
     let audioChunks = [];
 
-    document.getElementById('startBtn').addEventListener('click', startRecording);
-    document.getElementById('stopBtn').addEventListener('click', stopRecording);
-    document.getElementById('sendBtn').addEventListener('click', sendAudio);
+    // Получаем все необходимые элементы
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const sendBtn = document.getElementById('sendBtn');
+    const audioPreview = document.getElementById('audioPreview');
+    const referenceAudioInput = document.getElementById('referenceAudioInput');
+    const audioList = document.getElementById('audioList');
+    const userAudioSelect = document.getElementById('userAudioSelect');
+    const referenceAudioSelect = document.getElementById('referenceAudioSelect');
+    const compareBtn = document.getElementById('compareBtn');
+    const comparisonResult = document.getElementById('comparisonResult');
 
-    async function startRecording() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
-
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            document.getElementById('audioPreview').src = audioUrl;
-            document.getElementById('sendBtn').disabled = false; // Включаем кнопку отправки
-        };
-
-        mediaRecorder.start();
-        document.getElementById('startBtn').disabled = true;
-        document.getElementById('stopBtn').disabled = false;
+    // Функция загрузки списка аудио
+    async function loadAudioList() {
+        try {
+            const response = await fetch('/upload');
+            if (response.ok) {
+                const files = await response.json();
+                updateAudioList(files);
+                updateSelectOptions(files);
+            }
+        } catch (error) {
+            console.error('Error loading audio files:', error);
+        }
     }
 
+    // Функция обновления списка аудио
+    function updateAudioList(files) {
+        audioList.innerHTML = '';
+        files.forEach(file => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-2 bg-gray-50 rounded';
+            div.innerHTML = `
+                    <span>${file.filename}</span>
+                    <div class="flex space-x-2">
+                        <audio controls class="h-8">
+                            <source src="/upload/audio/${file.id}" type="audio/wav">
+                        </audio>
+                        <button onclick="deleteAudio(${file.id})" class="p-1 text-red-600 hover:text-red-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            audioList.appendChild(div);
+        });
+    }
+
+    // Функция обновления options в select
+    function updateSelectOptions(files) {
+        const options = files.map(file =>
+            `<option value="${file.id}">${file.filename}</option>`
+        ).join('');
+
+        userAudioSelect.innerHTML = '<option value="">Выберите аудио</option>' + options;
+        referenceAudioSelect.innerHTML = '<option value="">Выберите аудио</option>' + options;
+    }
+
+    // Функция записи аудио
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                audioPreview.src = URL.createObjectURL(audioBlob);
+                sendBtn.disabled = false;
+            };
+
+            mediaRecorder.start();
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Ошибка при запуске записи. Убедитесь, что микрофон подключен и разрешения даны.');
+        }
+    }
+
+    // Функция остановки записи
     function stopRecording() {
         mediaRecorder.stop();
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('stopBtn').disabled = true;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
     }
 
+    // Функция отправки записанного аудио
     async function sendAudio() {
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.wav');
 
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (response.ok) {
-            alert('Audio uploaded successfully!');
-            loadAudioFiles(); // Обновляем список после загрузки
-        } else {
-            alert('Error uploading audio.');
-        }
-    }
-
-    async function loadAudioFiles() {
-        const response = await fetch('/upload');
-        if (response.ok) {
-            const audioFiles = await response.json();
-            const audioList = document.getElementById('audioList');
-            audioList.innerHTML = ''; // Очищаем список перед загрузкой
-
-            audioFiles.forEach(file => {
-                const container = document.createElement('div');
-                container.classList.add('audio-item');
-
-                // Создаем элемент <audio>
-                const audio = document.createElement('audio');
-                audio.controls = true;
-                const audioBlob = new Blob([new Uint8Array(atob(file.audioData).split("").map(c => c.charCodeAt(0)))], { type: 'audio/wav' });
-                audio.src = URL.createObjectURL(audioBlob);
-
-                // Создаем кнопку "Удалить"
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Удалить';
-                deleteBtn.onclick = async () => {
-                    const deleteResponse = await fetch(`/upload/${file.id}`, { method: 'DELETE' });
-                    if (deleteResponse.ok) {
-                        alert('Audio deleted successfully!');
-                        loadAudioFiles(); // Обновляем список
-                    } else {
-                        alert('Error deleting audio.');
-                    }
-                };
-
-                // Добавляем элементы в контейнер
-                container.appendChild(audio);
-                container.appendChild(deleteBtn);
-                audioList.appendChild(container);
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
             });
-        } else {
-            alert('Error loading audio files.');
+
+            if (response.ok) {
+                alert('Аудио успешно загружено!');
+                loadAudioList();
+                sendBtn.disabled = true;
+            } else {
+                alert('Ошибка при загрузке аудио.');
+            }
+        } catch (error) {
+            console.error('Error sending audio:', error);
+            alert('Ошибка при отправке аудио.');
         }
     }
 
-    // Загружаем список при загрузке страницы
-    window.onload = loadAudioFiles;
+    // Функция удаления аудио
+    async function deleteAudio(id) {
+        try {
+            const response = await fetch(`/upload/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                loadAudioList();
+            }
+        } catch (error) {
+            console.error('Error deleting audio:', error);
+            alert('Ошибка при удалении аудио.');
+        }
+    }
+
+    // Функция загрузки эталонного аудио
+    async function handleReferenceAudioUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('audio', file);
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                alert('Эталонное аудио успешно загружено!');
+                loadAudioList();
+            } else {
+                alert('Ошибка при загрузке эталонного аудио.');
+            }
+        } catch (error) {
+            console.error('Error uploading reference audio:', error);
+            alert('Ошибка при загрузке эталонного аудио.');
+        }
+    }
+
+    // Функция сравнения аудио
+    async function compareAudio() {
+        const userAudioId = userAudioSelect.value;
+        const referenceAudioId = referenceAudioSelect.value;
+
+        if (!userAudioId || !referenceAudioId) {
+            alert('Пожалуйста, выберите оба аудиофайла для сравнения');
+            return;
+        }
+
+        try {
+            const response = await fetch('/upload/compare', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `userAudioId=${userAudioId}&referenceAudioId=${referenceAudioId}`
+            });
+
+            if (response.ok) {
+                const result = await response.text();
+                comparisonResult.textContent = result;
+                comparisonResult.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error comparing audio:', error);
+            alert('Ошибка при сравнении аудио.');
+        }
+    }
+
+    // Добавляем обработчики событий
+    startBtn.addEventListener('click', startRecording);
+    stopBtn.addEventListener('click', stopRecording);
+    sendBtn.addEventListener('click', sendAudio);
+    referenceAudioInput.addEventListener('change', handleReferenceAudioUpload);
+    compareBtn.addEventListener('click', compareAudio);
+
+    // Загружаем список аудио при загрузке страницы
+    loadAudioList();
 </script>
 </body>
 </html>
