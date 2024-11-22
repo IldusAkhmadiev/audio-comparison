@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recording</title>
+</head>
+<body>
+<h1>Записать свой голос</h1>
+<button id="startBtn">Начать запись</button>
+<button id="stopBtn" disabled>Остановить запись</button>
+<br/>
+<audio id="audioPreview" controls></audio>
+<br/>
+<button id="sendBtn" disabled>Отправить аудио</button>
+
+<h1>Список загруженных аудио</h1>
+<div id="audioList"></div>
+
+<script>
+    let mediaRecorder;
+    let audioChunks = [];
+
+    document.getElementById('startBtn').addEventListener('click', startRecording);
+    document.getElementById('stopBtn').addEventListener('click', stopRecording);
+    document.getElementById('sendBtn').addEventListener('click', sendAudio);
+
+    async function startRecording() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            document.getElementById('audioPreview').src = audioUrl;
+            document.getElementById('sendBtn').disabled = false; // Включаем кнопку отправки
+        };
+
+        mediaRecorder.start();
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+    }
+
+    function stopRecording() {
+        mediaRecorder.stop();
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+    }
+
+    async function sendAudio() {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.wav');
+
+        const response = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            alert('Audio uploaded successfully!');
+            loadAudioFiles(); // Обновляем список после загрузки
+        } else {
+            alert('Error uploading audio.');
+        }
+    }
+
+    async function loadAudioFiles() {
+        const response = await fetch('/upload');
+        if (response.ok) {
+            const audioFiles = await response.json();
+            const audioList = document.getElementById('audioList');
+            audioList.innerHTML = ''; // Очищаем список перед загрузкой
+
+            audioFiles.forEach(file => {
+                const container = document.createElement('div');
+                container.classList.add('audio-item');
+
+                // Создаем элемент <audio>
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                const audioBlob = new Blob([new Uint8Array(atob(file.audioData).split("").map(c => c.charCodeAt(0)))], { type: 'audio/wav' });
+                audio.src = URL.createObjectURL(audioBlob);
+
+                // Создаем кнопку "Удалить"
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Удалить';
+                deleteBtn.onclick = async () => {
+                    const deleteResponse = await fetch(`/upload/${file.id}`, { method: 'DELETE' });
+                    if (deleteResponse.ok) {
+                        alert('Audio deleted successfully!');
+                        loadAudioFiles(); // Обновляем список
+                    } else {
+                        alert('Error deleting audio.');
+                    }
+                };
+
+                // Добавляем элементы в контейнер
+                container.appendChild(audio);
+                container.appendChild(deleteBtn);
+                audioList.appendChild(container);
+            });
+        } else {
+            alert('Error loading audio files.');
+        }
+    }
+
+    // Загружаем список при загрузке страницы
+    window.onload = loadAudioFiles;
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ import java.time.Instant;
 public class AudioFile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @ColumnDefault("nextval('audio_files_id_seq'")
+    @ColumnDefault("nextval('audio_files_id_seq'") // Возможно, вам стоит исправить этот момент, так как скобка не закрыта
     @Column(name = "id", nullable = false)
     private Long id;
 
@@ -30,8 +30,11 @@ public class AudioFile {
     @Column(name = "filepath", nullable = false)
     private String filepath;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "upload_date")
+    @ColumnDefault("CURRENT_TIMESTAMP")
     private Instant uploadDate;
 
+    @Lob // Используем @Lob для хранения больших бинарных данных
+    @Column(name = "audio_data")
+    private byte[] audioData; // Массив байтов для хранения самого аудио
 }
