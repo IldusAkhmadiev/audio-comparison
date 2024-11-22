@@ -7,8 +7,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
+import java.io.File;
+import java.nio.file.Files;
+import ws.schild.jave.Encoder;
+import ws.schild.jave.MultimediaObject;
+import ws.schild.jave.encode.AudioAttributes;
+import ws.schild.jave.encode.EncodingAttributes;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.List;
 
@@ -24,22 +32,47 @@ public class RestAudioController {
     @Transactional
     public ResponseEntity<String> uploadAudio(@RequestParam("audio") MultipartFile audioFile) {
         try {
-            // Получаем аудиофайл как byte[]
-            byte[] audioBytes = audioFile.getBytes();
+            // Конвертация в WAV
+            byte[] wavBytes = convertToWav(audioFile);
 
-            // Создаем объект AudioFile и устанавливаем данные
             AudioFile audio = new AudioFile();
-            audio.setFilename(audioFile.getOriginalFilename());
-            audio.setFilepath("/path/to/saved/file");  // Если нужно сохранить путь
+            audio.setFilename(audioFile.getOriginalFilename().replaceAll("\\.[^.]+$", ".wav"));
+            audio.setFilepath("/path/to/saved/file");
             audio.setUploadDate(Instant.now());
-            audio.setAudioData(audioBytes);
+            audio.setAudioData(wavBytes);
 
-            // Сохраняем аудиофайл в базу данных
             audioFileRepository.save(audio);
 
-            return ResponseEntity.ok("File uploaded and saved in database successfully.");
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body("Error uploading file: " + e.getMessage());
+            return ResponseEntity.ok("File converted to WAV and saved successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error processing file: " + e.getMessage());
+        }
+    }
+
+    private byte[] convertToWav(MultipartFile audioFile) throws Exception {
+        File inputFile = File.createTempFile("input", audioFile.getOriginalFilename());
+        File outputFile = File.createTempFile("output", ".wav");
+
+        try {
+            audioFile.transferTo(inputFile);
+
+            AudioAttributes audio = new AudioAttributes();
+            audio.setCodec("pcm_s16le");
+            audio.setBitRate(192000);
+            audio.setChannels(2);
+            audio.setSamplingRate(44100);
+
+            EncodingAttributes attrs = new EncodingAttributes();
+            attrs.setOutputFormat("wav");
+            attrs.setAudioAttributes(audio);
+
+            Encoder encoder = new Encoder();
+            encoder.encode(new MultimediaObject(inputFile), outputFile, attrs);
+
+            return Files.readAllBytes(outputFile.toPath());
+        } finally {
+            inputFile.delete();
+            outputFile.delete();
         }
     }
 
